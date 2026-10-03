@@ -1,0 +1,26 @@
+# System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Development & Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+*.pyc
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.bandit_cache/
+
+# Security Sensitive Files
+.env
+.env.local
+.env.*.local
+*.log
+
+# Databases & Dynamic Artifacts
+data/
+*.db
+*.sqlite
