@@ -8,6 +8,7 @@ and automated transactional persistence pipelines.
 import sys
 from pathlib import Path
 from fastapi import FastAPI, status, HTTPException
+from typing import Any
 
 # Adjust the system path explicitly to guarantee seamless absolute runtime module discoverability
 sys.path.append(str(Path(__file__).resolve().parent))
@@ -123,3 +124,42 @@ def ingest_client_webhook_payload(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal engineering processing threshold error. Transaction rolled back safely."
         )
+
+# ==============================================================================
+# 4. Enterprise Global Exception Overrides & Structural Validation Mapping
+# ==============================================================================
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi import Request
+
+@app.exception_handler(RequestValidationError)
+def global_validation_exception_override_handler(
+    _request: Request, 
+    exception_packet: RequestValidationError
+) -> JSONResponse:
+    """
+    Globally intercepts incoming schema-malformed payload exception states.
+    Suppresses native long structural framework traces, returning a clean diagnostic array
+    to client APIs while dumping the precise anomaly straight to our RotatingFileHandler log database.
+    """
+    error_summary_metrics: list[dict[str, Any]] = []
+    for issue in exception_packet.errors():
+        error_summary_metrics.append({
+            "target_field": " -> ".join(str(path_node) for path_node in issue.get("loc", []) if path_node != "body"),
+            "issue_type": issue.get("type"),
+            "diagnostic_message": issue.get("msg")
+        })
+        
+    logger.error(
+        f"Validation Boundary Intercepted Malformed Incoming Payload: "
+        f"Detected structural anomaly matrix: {json.dumps(error_summary_metrics)}"
+    )
+    
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "status": "error",
+            "reason": "Provided request schema structural data parameter configurations failed type coercion guardrails.",
+            "anomalies": error_summary_metrics
+        }
+    )
