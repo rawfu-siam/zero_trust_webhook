@@ -38,3 +38,26 @@ def execute_automation_iteration(iteration_id: int) -> None:
         )
         
     logger.info(f"Pipeline milestone completed successfully for task entity ID: {iteration_id}")
+
+def run_high_velocity_worker_loop(target_iterations: int = 400) -> None:
+    """
+    Drives a high-throughput pipeline runner execution sequence.
+    Pipes deep validation tracing into the logger utility to force 50KB boundary splits.
+    """
+    logger.info(f"System Boot: Launching automated logging storage shield stress test for {target_iterations} iterations.")
+    
+    for iteration in range(1, target_iterations + 1):
+        try:
+            execute_automation_iteration(iteration_id=iteration)
+        except WorkerPipelineError as error_trace:
+            # Catch transient failures safely, logging complete contextual trace metrics
+            logger.error(f"Execution Exception Caught on Step #{iteration}: {str(error_trace)}")
+        
+        # Micro-delay to avoid CPU lockup while maintaining rapid sequential high-throughput volume
+        time.sleep(0.002)
+        
+    logger.info("Stress Testing Suite Complete. Validating local log rotation targets...")
+
+if __name__ == "__main__":
+    # Standard fallback deployment size to ensure rotation thresholds are easily breached
+    run_high_velocity_worker_loop()
