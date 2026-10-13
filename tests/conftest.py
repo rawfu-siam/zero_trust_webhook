@@ -48,3 +48,25 @@ def run_database_bootstrap_lifecycle() -> Generator[None, None, None]:
             DB_FILE_PATH.unlink()
         except OSError:
             pass
+
+@pytest.fixture(scope="function")
+def client() -> Generator[TestClient, None, None]:
+    """
+    Function-scoped testing client fixture runner.
+    Yields an isolated FastAPI TestClient block, then aggressively clears out 
+    relational data records between case runs to maintain pristine testing states.
+    """
+    with TestClient(app) as test_client:
+        yield test_client
+        
+    # Boundary Cleanup: Execute dynamic table truncation queries after every test case run
+    try:
+        from database import get_db_connection
+        with get_db_connection() as connection:
+            cursor = connection.cursor()
+            # Clear target lead record allocations cleanly without killing DDL structures
+            cursor.execute("DELETE FROM processed_webhooks;")
+            connection.commit()
+    except Exception:
+        # Gracefully log or pass if database unlinking happened during session teardown
+        pass
