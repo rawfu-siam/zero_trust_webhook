@@ -1,0 +1,52 @@
+
+name: Continuous Integration Guardrails
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  execute-verification-suite:
+    name: Lint, Security, and Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.5.24"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Create virtual environment
+        run: uv venv --python 3.12 .venv
+
+      - name: Install dependencies
+        run: uv pip sync --python .venv/bin/python requirements.txt
+
+      - name: Ruff lint
+        run: uv run --no-sync ruff check .
+
+      - name: Ruff format check
+        run: uv run --no-sync ruff format --check .
+
+      - name: Bandit security scan
+        run: uv run --no-sync bandit -lll -v --recursive src/
+
+      - name: Run tests
+        env:
+          APP_ENV: testing
+          LOG_LEVEL: DEBUG
+          WEBHOOK_SECRET_TOKEN: test-only-placeholder
+          DATABASE_URL: sqlite:///./tests/test_sandbox_vault.db
+        run: uv run --no-sync pytest tests/ -v
