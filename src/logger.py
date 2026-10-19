@@ -6,9 +6,9 @@ Establishes a dual-stream rotating file logger framework to handle automation tr
 
 import logging
 import sys
-import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
 from config import settings
 
 # 1. Resolve Runtime Log Persistence Boundaries
@@ -19,7 +19,7 @@ LOG_FILE_PATH: Path = LOG_DIR / "app.log"
 # 2. Define Enterprise-Grade Structured Log Formatter String Layout
 LOG_FORMATTER: logging.Formatter = logging.Formatter(
     fmt="%(asctime)s | %(levelname)-8s | %(filename)s:%(lineno)d | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
 # 3. Initialize Core Corporate Log Instance Engine
@@ -35,10 +35,7 @@ logger.setLevel(numeric_level)
 # ==============================================================================
 # 50KB size cap constraint (50 * 1024 Bytes) with a 3-file back-up rotation buffer
 FILE_STREAM_SHIELD: RotatingFileHandler = RotatingFileHandler(
-    filename=LOG_FILE_PATH,
-    maxBytes=51200,
-    backupCount=3,
-    encoding="utf-8"
+    filename=LOG_FILE_PATH, maxBytes=51200, backupCount=3, encoding="utf-8"
 )
 FILE_STREAM_SHIELD.setFormatter(LOG_FORMATTER)
 logger.addHandler(FILE_STREAM_SHIELD)

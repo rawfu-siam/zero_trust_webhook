@@ -6,15 +6,17 @@ Coordinates low-level transactional connection wrappers and auto-provisions sche
 
 import sqlite3
 import sys
-from pathlib import Path
 from contextlib import contextmanager
-from typing import Generator, Final, Optional
+from pathlib import Path
+from typing import Final, Generator, Optional
+
 from config import settings
 from logger import logger
 
 # 1. Resolve Immutable Path String Targets from Validated Configuration Layer
 DB_CONNECTION_STRING: Final[str] = settings.DATABASE_URL.replace("sqlite:///", "")
 DB_FILE_PATH: Final[Path] = Path(DB_CONNECTION_STRING).resolve()
+
 
 @contextmanager
 def get_db_connection() -> Generator[sqlite3.Connection, None, None]:
@@ -28,19 +30,22 @@ def get_db_connection() -> Generator[sqlite3.Connection, None, None]:
         # Guarantee relational row tracking configurations are returned as indexed mapping dict structures
         connection = sqlite3.connect(database=str(DB_FILE_PATH), timeout=10.0)
         connection.row_factory = sqlite3.Row
-        
+
         # Enforce foreign key constraints inside SQLite core explicitly on every thread session boot
         connection.execute("PRAGMA foreign_keys = ON;")
-        
+
         yield connection
-        
+
     except sqlite3.OperationalError as db_fault:
-        logger.critical(f"Database Boundary Integrity Breached: Transaction connectivity pool failed. Detail: {str(db_fault)}")
+        logger.critical(
+            f"Database Boundary Integrity Breached: Transaction connectivity pool failed. Detail: {str(db_fault)}"
+        )
         raise db_fault
-        
+
     finally:
         if connection:
             connection.close()
+
 
 # ==============================================================================
 # 2. Enterprise Relational Schema Definitions (DDL Declarations)
@@ -58,6 +63,7 @@ CREATE TABLE IF NOT EXISTS processed_webhooks (
 );
 """
 
+
 # ==============================================================================
 # 3. Defensive Schema Initialization Bootstrapping
 # ==============================================================================
@@ -67,23 +73,28 @@ def initialize_database_schema() -> None:
     Guarantees target persistence layer storage structures exist before processing events.
     """
     logger.info("Initializing relational database storage schema validation layouts...")
-    
+
     # Auto-generate target parent container folders to avoid local IO system faults
     DB_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    
+
     try:
         with get_db_connection() as connection:
             cursor: sqlite3.Cursor = connection.cursor()
-            
+
             # Execute DDL table mapping schema blocks atomically
             cursor.execute(INGESTION_TABLE_DDL)
             connection.commit()
-            
-            logger.info("Database schema structure check verified successfully. Tables generated.")
-            
+
+            logger.info(
+                "Database schema structure check verified successfully. Tables generated."
+            )
+
     except sqlite3.Error as schema_fault:
-        logger.critical(f"FATAL: Structural table blueprint injection failed down internal pipeline: {str(schema_fault)}")
+        logger.critical(
+            f"FATAL: Structural table blueprint injection failed down internal pipeline: {str(schema_fault)}"
+        )
         sys.exit(1)
+
 
 # Ensure database tables map correctly onto current workspace layer during module compile cycles
 if __name__ not in ("__main__", "src.database"):
