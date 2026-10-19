@@ -65,3 +65,62 @@ def test_webhook_ingest_unauthorized_header_interception(client: TestClient) -> 
     response = client.post("/webhook/ingest", headers=INVALID_AUTH_HEADERS, json=mock_payload)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert "detail" in response.json()
+
+def test_webhook_ingest_idempotency_guardrail(client: TestClient) -> None:
+    """Ensures duplicate webhook event submissions throw a transactional conflict."""
+    mock_payload: dict[str, str] = {
+        "event_id": "evt_duplicate_100",
+        "lead_name": "John Connor",
+        "lead_email": "john.connor@resistance.net",
+        "lead_phone": "15559998888"
+    }
+
+    # First entry submission (Should succeed)
+    first_response = client.post("/webhook/ingest", headers=VALID_AUTH_HEADERS, json=mock_payload)
+    assert first_response.status_code == status.HTTP_201_CREATED
+
+    # Identical sequential entry submission (Should trigger our database duplicate block)
+    second_response = client.post("/webhook/ingest", headers=VALID_AUTH_HEADERS, json=mock_payload)
+    assert second_response.status_code == status.HTTP_409_CONFLICT
+    assert "processed" in second_response.json()["detail"]
+
+
+def test_webhook_ingest_malformed_payload_interception(client: TestClient) -> None:
+    """Verifies that heavily corrupted data schemas trigger our custom diagnostic 422 JSON array."""
+    corrupted_payload: dict[str, str] = {
+        "event_id": "shrt",
+        "lead_name": "A",
+        "lead_email": "broken-email-string",
+        "lead_phone": "invalid_phone_123"
+    }
+
+    response = client.post("/webhook/ingest", headers=VALID_AUTH_HEADERS, json=corrupted_payload)
+    
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    response_data = response.json()
+    assert response_data["status"] == "error"
+    assert "anomalies" in response_data
+    # Ensure our diagnostic override captures specific array fields cleanly
+    assert len(response_data["anomalies"]) > 0
+
+
+def test_webhook_ingest_phone_sanitation_normalization(client: TestClient) -> None:
+    """Ensures complex, messy white-space phone layouts clean up perfectly on database write."""
+    messy_payload: dict[str, str] = {
+        "event_id": "evt_phone_clean_200",
+        "lead_name": "Ellen Ripley",
+        "lead_email": "ripley@nostromo.org",
+        "lead_phone": "  +1 (800)-555-2345  "
+    }
+
+    response = client.post("/webhook/ingest", headers=VALID_AUTH_HEADERS, json=messy_payload)
+    assert response.status_code == status.HTTP_201_CREATED
+
+    with get_db_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute("SELECT lead_phone FROM processed_webhooks WHERE event_id = ?;", (messy_payload["event_id"],))
+        row = cursor.fetchone()
+
+    assert row is not None
+    # Verify the regex completely normalized typography bounds
+    assert row["lead_phone"] == "18005552345"
