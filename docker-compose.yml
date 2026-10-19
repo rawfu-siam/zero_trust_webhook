@@ -1,0 +1,33 @@
+# ==============================================================================
+# docker-compose.yml
+# Multi-Service Network Orchestration Fabric
+# Enforces zero-trust read-only source files and compliant volume definitions.
+# ==============================================================================
+
+version: "3.8"
+
+services:
+  webhook_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zero_trust_webhook_container
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src:ro
+      - agency_db_data:/app/src/data
+      - agency_log_data:/app/src/logs
+    networks:
+      - agency_secure_network
+
+volumes:
+  agency_db_data:
+  agency_log_data:
+
+networks:
+  agency_secure_network:
+    driver: bridge
